@@ -24,11 +24,12 @@ const wrongAnswerAudio = new Audio('./assets/audios/SFX/wrong_answer.mp3');
 // Render the initial UI (with logo and title)
 function renderInitialUI() {
   document.querySelector('#app').innerHTML = `
-    <div>
+    <div id="game">
       <img src="${botLogo}" class="logo" alt="The Language Jungle" />
       <h1>The Language Jungle</h1>
       <p>Get ready to test your language skills in this game!</p>
     </div>
+    <div id="scoreboard" hidden></div>
   `;
 }
 
@@ -37,11 +38,10 @@ setupDiscordSdk().then(() => {
   console.log("Discord SDK is authenticated");
   // appendVoiceChannelName();
   // appendGuildAvatar();
-  // // Now that the SDK is ready, play background music
+  // Now that the SDK is ready, play background music
   // playBackgroundMusic();
-  renderInitialUI();  // Show the initial UI with the logo and title
   // updatePresence();
-  startGame();        // Ensure the game starts here
+  startGame(); // Ensure the game starts here
 });
 
 
@@ -101,7 +101,6 @@ async function setupDiscordSdk() {
   await discordSdk.ready();
   console.log("Discord SDK is ready");
 
-  console.log("yesss")
   // Authorize with Discord Client
   const { code } = await discordSdk.commands.authorize({
     client_id: import.meta.env.VITE_DISCORD_CLIENT_ID,
@@ -115,7 +114,6 @@ async function setupDiscordSdk() {
     ],
   });
 
-  console.log("gimme code: ")
   return
 
   // Retrieve an access_token from your activity's server
@@ -198,12 +196,33 @@ async function startGame() {
   currentRound = 0;
   remainingAttempts = maxAttempts;
   isGameOver = false;
-  document.querySelector('#app').innerHTML += `<h2>Game starting!</h2>`;
+  const appElement = document.querySelector('#app');
+  appElement.querySelector("#game").innerHTML += `<h2>Game starting!</h2>`;
+  const scoreboardElement = appElement.querySelector("#scoreboard")
+  scoreboardElement.innerHTML = `
+    <div id="flags-container" class="flags-container">
+      <h3>Guesses:</h3>
+      <div class="flags-wrapper">
+        <div id="pc-flags" class="pc-flags">
+          <h4>PC</h4>
+          <!-- Correct answers will go here -->
+        </div>
+        <div id="player-flags" class="player-flags">
+          <h4>You</h4>
+          <!-- Player's guesses will go here -->
+        </div>
+      </div>
+    </div>
+  `;
   // startAudioPlayback();
+  scoreboardElement.removeAttribute("hidden");
   nextRound();
 }
 
 function nextRound() {
+  const appElement = document.querySelector('#app');
+  const gameElement = appElement.querySelector('#game');
+
   if (currentRound >= maxRounds || isGameOver) {
     endGame(true);
     return;
@@ -211,11 +230,13 @@ function nextRound() {
 
   currentRound++;
 
-  document.querySelector('#app').innerHTML = `
-    <h2>Round ${currentRound}</h2>
-    <p>Get ready! The audio will play after the countdown.</p>
-    <p>Attempts left: ${remainingAttempts}</p>
-    <p id="timer"></p> <!-- Ensure the timer element is present in the UI -->
+  gameElement.innerHTML = `
+    <div>
+      <h2>Round ${currentRound}</h2>
+      <p>Get ready! The audio will play after the countdown.</p>
+      <p>❤️ ${remainingAttempts}</p>
+      <p id="timer"></p> <!-- Ensure the timer element is present in the UI -->
+    </div>
   `;
 
   showCountdown(countDownInSecs, startAudioPlayback);
@@ -226,10 +247,10 @@ function startAudioPlayback() {
   const currentAudioObj = audioFiles[randomIndex];
   currentAudio = currentAudioObj.path;
 
-  document.querySelector('#app').innerHTML = `
+  document.querySelector('#app').querySelector("#game").innerHTML = `
     <h2>Round ${currentRound}</h2>
     <p>Guess the language after the audio finishes!</p>
-    <p>Attempts left: ${remainingAttempts}</p>
+    <p>❤️ ${remainingAttempts}</p>
     <p id="timer"></p>
     <p id="audioDuration">Audio: 0:00 / 0:00</p> <!-- Placeholder for audio duration -->
     <input id="languageInput" type="text" disabled />
@@ -274,8 +295,27 @@ function formatTime(seconds) {
 
 function checkAnswer(userInput, answer) {
   const correctAnswer = answer; // The file name without extension
-  if (userInput.trim().toLowerCase() === correctAnswer.toLowerCase()) {
+  const userAnswer = userInput.trim().toLowerCase();
+
+  // Determine paths to the correct and guessed flag images
+  const correctFlagImagePath = `./assets/images/graphic/flags/${correctAnswer}.png`;
+  const guessedFlagImagePath = `./assets/images/graphic/flags/${userAnswer}.png`;
+
+  const appElement = document.querySelector("#app");
+  const gameElement = appElement.querySelector("#game");
+
+  if (userAnswer === correctAnswer.toLowerCase()) {
     correctAnswerAudio.play();
+    gameElement.innerHTML += `
+      <p>Correct!</p>
+      <p id="animation-popup">Correct!</p>
+    `;
+
+    // triggerCorrectAnswerAnimation();
+
+    // Show the flags for both PC and Player (correct guess)
+    appendFlagImage(correctAnswer, correctFlagImagePath, 'pc-flags'); // PC flag
+    appendFlagImage(userAnswer, guessedFlagImagePath, 'player-flags'); // Player flag
 
     // After the audio finishes playing, go to the next round
     correctAnswerAudio.onended = () => {
@@ -283,9 +323,14 @@ function checkAnswer(userInput, answer) {
     };
   } else {
     remainingAttempts--;
-    document.querySelector('#app').innerHTML += `
+    gameElement.innerHTML += `
       <p>Wrong guess! The correct answer was: <strong>${correctAnswer}</strong></p>
     `;
+
+    // Show the flags for both PC and Player (correct guess)
+    appendFlagImage(correctAnswer, correctFlagImagePath, 'pc-flags'); // PC flag
+    appendFlagImage(userAnswer, guessedFlagImagePath, 'player-flags'); // Player flag
+
     // Play the wrong answer audio
     wrongAnswerAudio.play();
 
@@ -297,7 +342,7 @@ function checkAnswer(userInput, answer) {
     } else {
       wrongAnswerAudio.onended = () => {
         document.querySelector("#languageInput").value = ""; // Reset the input field
-        document.querySelector('#app').querySelector("p:nth-of-type(2)").textContent = `Attempts left: ${remainingAttempts}`; // Update attempts left
+        gameElement.querySelector("p:nth-of-type(2)").textContent = `❤️ ${remainingAttempts}`; // Update attempts left
         nextRound(); // Go to the next round after wrong answer audio finishes
       };
     }
@@ -349,3 +394,34 @@ async function updatePresence() {
 
   console.log("Discord presence updated");
 }
+
+function triggerCorrectAnswerAnimation() {
+  const animationPopup = document.getElementById('animation-popup');
+  
+  // Show the animation by adding the class
+  animationPopup.classList.remove('hidden');
+  animationPopup.classList.add('show-animation');
+  
+  // Hide the animation after 1 second
+  setTimeout(() => {
+    animationPopup.classList.add('hide');
+    
+    // After the transition, hide the element completely
+    setTimeout(() => {
+      animationPopup.classList.remove('show-animation', 'hide');
+      animationPopup.classList.add('hidden');
+    }, 500); // Matches the transition duration
+  }, 1000); // Duration for the animation to stay visible
+}
+
+// Function to append a flag image to the correct column (either PC or Player)
+function appendFlagImage(language, flagImagePath, targetContainerId) {
+  const flagsContainer = document.getElementById(targetContainerId);
+  const flagImg = document.createElement('img');
+  flagImg.setAttribute('src', flagImagePath); // Path to the flag image
+  flagImg.setAttribute('alt', language); // Alt text for accessibility
+  flagsContainer.appendChild(flagImg); // Append the flag image to the correct container
+}
+
+// Show the initial UI with the logo and title
+renderInitialUI();
