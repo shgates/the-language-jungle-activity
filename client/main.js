@@ -50,7 +50,6 @@ setupDiscordSdk().then(() => {
 `;
 
   document.querySelector('#startGame').addEventListener('click', () => { startGame() });
-  // startGame(); // Ensure the game starts here
 });
 
 
